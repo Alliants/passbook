@@ -5,14 +5,15 @@ require 'base64'
 
 module Passbook
   class PKPass
-    attr_accessor :pass, :manifest_files, :signer
+    attr_accessor :pass, :manifest_files, :signer, :root_dir
 
     TYPES = ['boarding-pass', 'coupon', 'event-ticket', 'store-card', 'generic']
 
-    def initialize(pass, init_signer = nil)
+    def initialize(pass, init_signer = nil, root_dir = nil)
       @pass           = pass
       @manifest_files = []
       @signer         = init_signer || Passbook::Signer.new
+      @root_dir       = root_dir
     end
 
     def addFile(file)
@@ -88,7 +89,11 @@ module Passbook
         if file.class == Hash
           sha1s[file[:name]] = Digest::SHA1.hexdigest file[:content]
         else
-          sha1s[File.basename(file)] = Digest::SHA1.file(file).hexdigest
+          if root_dir
+            sha1s[file] = Digest::SHA1.file("#{root_dir}#{file}").hexdigest
+          else
+            sha1s[File.basename(file)] = Digest::SHA1.file(file).hexdigest
+          end
         end
       end
 
@@ -110,8 +115,13 @@ module Passbook
             zip.put_next_entry file[:name]
             zip.print file[:content]
           else
-            zip.put_next_entry File.basename(file)
-            zip.print IO.read(file)
+            if root_dir
+              zip.put_next_entry file
+              zip.print IO.read("#{root_dir}#{file}")
+            else
+              zip.put_next_entry File.basename(file)
+              zip.print IO.read(file)
+            end
           end
         end
       end
